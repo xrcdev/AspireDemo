@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.22" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+	  <PackageReference Include="Aspire.Hosting.Docker" Version="9.5.2-preview.1.25522.3" />
   </ItemGroup>
 
   <ItemGroup>
