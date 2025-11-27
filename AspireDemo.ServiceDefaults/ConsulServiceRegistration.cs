@@ -6,7 +6,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
 
 namespace Microsoft.Extensions.Hosting;
 
@@ -31,6 +33,11 @@ public class ConsulServiceRegistrationOptions
     public string? ServiceAddress { get; set; }
 
     /// <summary>
+    /// 在多网卡环境中指定优先使用的网络段 ,支持以指定前缀开头（如 "192.168."）或 匹配正则表达式模式; 多个网络段用逗号分隔
+    /// </summary>
+    public string? PreferredNetworks { get; set; }
+
+    /// <summary>
     /// 服务端口 (可选,默认自动获取)
     /// </summary>
     public int? ServicePort { get; set; }
@@ -48,17 +55,17 @@ public class ConsulServiceRegistrationOptions
     /// <summary>
     /// 服务的 Scheme (http/https)
     /// </summary>
-    public string Scheme { get; set; } = "http";
+    public string HttpScheme { get; set; } = "http";
 
     /// <summary>
-    /// 服务协议类型 (http, grpc, websocket 等)
+    /// 服务协议类型 (http(包括http和https), grpc, websocket 等)
     /// </summary>
-    public string Protocol { get; set; } = "http";
+    public string Protocol { get; set; } = ServiceProtocolTypes.Http;
 
     /// <summary>
     /// 健康检查路径
     /// </summary>
-    public string HealthCheckPath { get; set; } = "/health";
+    public string HealthCheckPath { get; set; } = HealthCheckPaths.Health;
 
     /// <summary>
     /// 健康检查间隔 (秒)
@@ -156,6 +163,7 @@ internal class ConsulServiceRegistrationHostedService : IHostedService
     private readonly ILogger<ConsulServiceRegistrationHostedService> _logger;
     private readonly IServer _server;
     private readonly IHostEnvironment _environment;
+    private readonly IHostApplicationLifetime _lifetime;
     private string? _serviceId;
 
     public ConsulServiceRegistrationHostedService(
@@ -163,66 +171,26 @@ internal class ConsulServiceRegistrationHostedService : IHostedService
         ConsulServiceRegistrationOptions options,
         ILogger<ConsulServiceRegistrationHostedService> logger,
         IServer server,
-        IHostEnvironment environment)
+        IHostEnvironment environment,
+        IHostApplicationLifetime lifetime)
     {
         _consulClient = consulClient;
         _options = options;
         _logger = logger;
         _server = server;
         _environment = environment;
+        _lifetime = lifetime;
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
-        // 等待服务器启动并获取地址
-        await Task.Delay(1000, cancellationToken); // 等待服务器完全启动
-
-        var (address, port, scheme) = GetServiceAddressAndPort();
-
-        _serviceId = $"{_options.ServiceName}-{address}-{port}-{Guid.NewGuid():N}";
-
-        // 构建元数据
-        var meta = new Dictionary<string, string>(_options.Meta)
+        // 注册在应用程序启动完成后执行
+        _lifetime.ApplicationStarted.Register(() =>
         {
-            ["pathPrefix"] = _options.PathPrefix ?? string.Empty,
-            ["weight"] = _options.Weight.ToString(),
-            ["scheme"] = scheme,
-            ["protocol"] = _options.Protocol,
-            ["environment"] = _environment.EnvironmentName
-        };
+            _ = RegisterToConsulAsync();
+        });
 
-        // 构建健康检查
-        var healthCheckUrl = $"{scheme}://{address}:{port}{_options.HealthCheckPath}";
-
-        var registration = new AgentServiceRegistration
-        {
-            ID = _serviceId,
-            Name = _options.ServiceName,
-            Address = address,
-            Port = port,
-            Tags = _options.Tags.ToArray(),
-            Meta = meta,
-            Check = new AgentServiceCheck
-            {
-                HTTP = healthCheckUrl,
-                Interval = TimeSpan.FromSeconds(_options.HealthCheckIntervalSeconds),
-                Timeout = TimeSpan.FromSeconds(_options.HealthCheckTimeoutSeconds),
-                DeregisterCriticalServiceAfter = TimeSpan.FromSeconds(_options.DeregisterCriticalServiceAfterSeconds),
-                TLSSkipVerify = true // 开发环境可能使用自签名证书
-            }
-        };
-
-        try
-        {
-            await _consulClient.Agent.ServiceRegister(registration, cancellationToken);
-            _logger.LogInformation(
-                "Service registered to Consul: {ServiceName} ({ServiceId}) at {Address}:{Port}",
-                _options.ServiceName, _serviceId, address, port);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to register service to Consul: {ServiceName}", _options.ServiceName);
-        }
+        return Task.CompletedTask;
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -241,12 +209,62 @@ internal class ConsulServiceRegistrationHostedService : IHostedService
         }
     }
 
+    private async Task RegisterToConsulAsync()
+    {
+        try
+        {
+            var (address, port, scheme) = GetServiceAddressAndPort();
+
+            _serviceId = $"{_options.ServiceName}-{address}-{port}-{Guid.NewGuid():N}";
+
+            // 构建元数据
+            var meta = new Dictionary<string, string>(_options.Meta)
+            {
+                ["pathPrefix"] = _options.PathPrefix ?? string.Empty,
+                ["weight"] = _options.Weight.ToString(),
+                ["scheme"] = scheme,
+                ["protocol"] = _options.Protocol,
+                ["environment"] = _environment.EnvironmentName
+            };
+
+            // 构建健康检查
+            var healthCheckUrl = $"{scheme}://{address}:{port}{_options.HealthCheckPath}";
+
+            var registration = new AgentServiceRegistration
+            {
+                ID = _serviceId,
+                Name = _options.ServiceName,
+                Address = address,
+                Port = port,
+                Tags = _options.Tags.ToArray(),
+                Meta = meta,
+                Check = new AgentServiceCheck
+                {
+                    HTTP = healthCheckUrl,
+                    Interval = TimeSpan.FromSeconds(_options.HealthCheckIntervalSeconds),
+                    Timeout = TimeSpan.FromSeconds(_options.HealthCheckTimeoutSeconds),
+                    DeregisterCriticalServiceAfter = TimeSpan.FromSeconds(_options.DeregisterCriticalServiceAfterSeconds),
+                    TLSSkipVerify = true // 开发环境可能使用自签名证书
+                }
+            };
+
+            await _consulClient.Agent.ServiceRegister(registration);
+            _logger.LogInformation(
+                "Service registered to Consul: {ServiceName} ({ServiceId}) at {Address}:{Port}",
+                _options.ServiceName, _serviceId, address, port);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to register service to Consul: {ServiceName}", _options.ServiceName);
+        }
+    }
+
     private (string address, int port, string scheme) GetServiceAddressAndPort()
     {
         // 优先使用配置的地址和端口
         if (!string.IsNullOrEmpty(_options.ServiceAddress) && _options.ServicePort.HasValue)
         {
-            return (_options.ServiceAddress, _options.ServicePort.Value, _options.Scheme);
+            return (_options.ServiceAddress, _options.ServicePort.Value, _options.HttpScheme);
         }
 
         // 尝试从服务器功能获取地址
@@ -255,53 +273,96 @@ internal class ConsulServiceRegistrationHostedService : IHostedService
 
         if (addresses?.Addresses != null && addresses.Addresses.Any())
         {
-            var addressUri = new Uri(addresses.Addresses.First());
-            var host = addressUri.Host;
-
-            // 如果是 localhost 或 +，尝试获取真实 IP
-            if (host == "localhost" || host == "+" || host == "*" || host == "0.0.0.0")
+            foreach (var item in addresses.Addresses)
             {
-                host = GetLocalIpAddress();
+                // 替换通配符地址为真实 IP
+                var addressUri = new Uri(ReplaceAddress(item, _options.PreferredNetworks));
+                return (addressUri.Host, addressUri.Port, addressUri.Scheme);
             }
-
-            return (host, addressUri.Port, addressUri.Scheme);
         }
 
         // 默认值
+        _logger.LogWarning("Unable to get server addresses from IServerAddressesFeature, using fallback IP address");
         return (
-            _options.ServiceAddress ?? GetLocalIpAddress(),
+            _options.ServiceAddress ?? GetCurrentIp(_options.PreferredNetworks ?? string.Empty),
             _options.ServicePort ?? 80,
-            _options.Scheme
+            _options.HttpScheme
         );
     }
 
-    private static string GetLocalIpAddress()
+    private static string ReplaceAddress(string address, string? preferredNetworks)
     {
+        var ip = GetCurrentIp(preferredNetworks ?? string.Empty);
+
+        if (address.Contains("*"))
+        {
+            address = address.Replace("*", ip);
+        }
+        else if (address.Contains("+"))
+        {
+            address = address.Replace("+", ip);
+        }
+        else if (address.Contains("localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            address = address.Replace("localhost", ip, StringComparison.OrdinalIgnoreCase);
+        }
+        else if (address.Contains("0.0.0.0", StringComparison.OrdinalIgnoreCase))
+        {
+            address = address.Replace("0.0.0.0", ip, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return address;
+    }
+
+    private static string GetCurrentIp(string preferredNetworks)
+    {
+        var instanceIp = "127.0.0.1";
+
         try
         {
-            using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            socket.Connect("8.8.8.8", 80);
-            if (socket.LocalEndPoint is IPEndPoint endPoint)
+            // 获取可用网卡
+            var nics = NetworkInterface.GetAllNetworkInterfaces()?.Where(network => network.OperationalStatus == OperationalStatus.Up);
+
+            // 获取所有可用网卡IP信息
+            var ipCollection = nics?.Select(x => x.GetIPProperties())?.SelectMany(x => x.UnicastAddresses);
+
+            var preferredNetworksArr = string.IsNullOrWhiteSpace(preferredNetworks)
+                ? Array.Empty<string>()
+                : preferredNetworks.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            foreach (var ipadd in ipCollection)
             {
-                return endPoint.Address.ToString();
+                if (!IPAddress.IsLoopback(ipadd.Address) &&
+                    ipadd.Address.AddressFamily == AddressFamily.InterNetwork)
+                {
+                    if (preferredNetworksArr.Length == 0)
+                    {
+                        instanceIp = ipadd.Address.ToString();
+                        break;
+                    }
+
+                    /*
+                    • 服务需要向 Consul 注册自己的真实IP地址
+                      • 在多网卡环境中需要选择正确的网卡IP
+                      • 支持通过 preferredNetworks 参数指定优先使用的网络段
+                      • 确保注册的IP地址是其他服务可以访问的有效地址
+                      • 检查IP是否以指定前缀开头（如 "192.168."）
+                      • 或者匹配正则表达式模式
+                     */
+                    if (!preferredNetworksArr.Any(preferredNetwork =>
+                            ipadd.Address.ToString().StartsWith(preferredNetwork)
+                            || Regex.IsMatch(ipadd.Address.ToString(), preferredNetwork))) continue;
+                    instanceIp = ipadd.Address.ToString();
+                    break;
+                }
             }
         }
         catch
         {
-            // 忽略异常
+            // ignored
         }
 
-        // 备选方案
-        var host = Dns.GetHostEntry(Dns.GetHostName());
-        foreach (var ip in host.AddressList)
-        {
-            if (ip.AddressFamily == AddressFamily.InterNetwork)
-            {
-                return ip.ToString();
-            }
-        }
-
-        return "localhost";
+        return instanceIp;
     }
 }
 
