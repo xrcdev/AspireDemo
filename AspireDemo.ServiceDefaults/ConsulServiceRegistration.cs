@@ -17,11 +17,7 @@ namespace Microsoft.Extensions.Hosting;
 /// </summary>
 public class ConsulServiceRegistrationOptions
 {
-    /// <summary>
-    /// Consul 服务器地址
-    /// </summary>
-    public string ConsulAddress { get; set; } = "http://localhost:8500";
-
+    
     /// <summary>
     /// 服务名称
     /// </summary>
@@ -33,34 +29,38 @@ public class ConsulServiceRegistrationOptions
     public string? ServiceAddress { get; set; }
 
     /// <summary>
-    /// 在多网卡环境中指定优先使用的网络段 ,支持以指定前缀开头（如 "192.168."）或 匹配正则表达式模式; 多个网络段用逗号分隔
-    /// </summary>
-    public string? PreferredNetworks { get; set; }
-
-    /// <summary>
     /// 服务端口 (可选,默认自动获取)
     /// </summary>
     public int? ServicePort { get; set; }
 
     /// <summary>
+    /// 在多网卡环境中指定优先使用的网络段 ,支持以指定前缀开头（如 "192.168."）或 匹配正则表达式模式; 多个网络段用逗号分隔
+    /// </summary>
+    public string? PreferredNetworks { get; set; }
+
+    
+
+    /// <summary>
     /// 服务的地址前缀 (如 /api/v1)
     /// </summary>
-    public string? PathPrefix { get; set; }
+    public string? PathPrefix { get; set; } = "";
 
     /// <summary>
     /// 服务权重 (用于负载均衡)
     /// </summary>
     public int Weight { get; set; } = 1;
 
+    
+    /// <summary>
+    /// 服务协议类型 (http(包括http和https), grpc, websocket 等)
+    /// </summary>
+    public string Protocol { get; set; } = ServiceProtocolTypes.Http;
+
     /// <summary>
     /// 服务的 Scheme (http/https)
     /// </summary>
     public string HttpScheme { get; set; } = "http";
 
-    /// <summary>
-    /// 服务协议类型 (http(包括http和https), grpc, websocket 等)
-    /// </summary>
-    public string Protocol { get; set; } = ServiceProtocolTypes.Http;
 
     /// <summary>
     /// 健康检查路径
@@ -91,6 +91,13 @@ public class ConsulServiceRegistrationOptions
     /// 服务标签
     /// </summary>
     public List<string> Tags { get; set; } = new();
+
+
+    /// <summary>
+    /// Consul 服务器地址
+    /// </summary>
+    public string ConsulAddress { get; set; } = "http://localhost:8500";
+
 }
 
 /// <summary>

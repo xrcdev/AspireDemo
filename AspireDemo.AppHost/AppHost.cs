@@ -7,11 +7,13 @@ var cache = builder.AddRedis("cache")
     .WithImageTag("8.2")
     .PublishAsConnectionString(); // 添加发布支持
 
-var consul = AddConsul(builder);
+var consul = AddConsul(builder)
+    .PublishAsContainer();
 
 var apiService = builder.AddProject<Projects.AspireDemo_ApiService>("apiservice")
     .WithHttpHealthCheck("/health")
-    .WaitFor(consul)
+    //.WithReference(consul)
+    //.WithAnnotation(new ResourceRelationshipAnnotation(consul.Resource, "Reference"))
     .WaitFor(consul)
     .WithEnvironment("Consul__ServerAddresses__0", consul.GetEndpoint("http"))
     .WithEnvironment("Consul__Address", consul.GetEndpoint("http"))
@@ -21,7 +23,6 @@ var apiService = builder.AddProject<Projects.AspireDemo_ApiService>("apiservice"
 var gateway = builder.AddProject<Projects.AspireDemo_Gateway>("gateway")
     .WithEnvironment("Consul__ServerAddresses__0", consul.GetEndpoint("http"))
     .WithEnvironment("Consul__Address", consul.GetEndpoint("http"))
-    .WaitFor(consul)
     .WaitFor(consul);
 
 var webfrontend = builder.AddProject<Projects.AspireDemo_Web>("webfrontend")
@@ -58,13 +59,16 @@ builder.Build().Run();
 /// </remarks>
 static IResourceBuilder<ContainerResource> AddConsul(IDistributedApplicationBuilder builder)
 {
-    return builder.AddContainer("consul", "hashicorp/consul", "1.22")
+    var consul = builder.AddContainer("consul", "hashicorp/consul", "1.22")
         .WithEnvironment("CONSUL_BIND_INTERFACE", "eth0")
         .WithArgs("agent", "-server", "-bootstrap-expect=1", "-ui", "-client=0.0.0.0", "-data-dir=/consul/data")
         .WithHttpEndpoint(port: 8500, targetPort: 8500, name: "http")
         .WithEndpoint(port: 8600, targetPort: 8600, name: "dns", scheme: "udp")
         .WithBindMount("consul-data", "/consul/data")
         .WithLifetime(ContainerLifetime.Persistent);
+
+    //consul.Resource.Annotations.Add(new ContainerNameAnnotation() { Name = "consul" });
+    return consul;
 }
 
 

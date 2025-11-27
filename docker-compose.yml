@@ -1,0 +1,6 @@
+services:
+  aspiredemo.apiservice:
+    image: ${DOCKER_REGISTRY-}aspiredemoapiservice
+    build:
+      context: .
+      dockerfile: AspireDemo.ApiService/Dockerfile

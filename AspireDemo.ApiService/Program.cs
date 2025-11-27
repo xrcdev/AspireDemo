@@ -7,18 +7,18 @@ builder.AddServiceDefaults();
 builder.AddConsulServiceRegistration(options =>
 {
     options.ServiceName = "apiservice";
-    options.PathPrefix = "/api";
-    options.Weight = 1;
-    options.Protocol = ServiceProtocolTypes.Http;
     options.PreferredNetworks = "10.10";
     options.Tags.Add("api");
     options.Tags.Add("weather");
 });
 
 // Add services to the container.
-builder.Services.AddProblemDetails();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddProblemDetails();
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
+}
 
 var app = builder.Build();
 
@@ -33,14 +33,17 @@ if (app.Environment.IsDevelopment())
 
 string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
 
-app.MapGet("/weatherforecast", () =>
+app.MapGet("/api/weatherforecast", () =>
 {
+    var formUrl = Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "Unknown";
+
     var forecast = Enumerable.Range(1, 5).Select(index =>
         new WeatherForecast
         (
             DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
             Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
+            summaries[Random.Shared.Next(summaries.Length)],
+            formUrl
         ))
         .ToArray();
     return forecast;
@@ -51,7 +54,7 @@ app.MapDefaultEndpoints();
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary, string FromUrl)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
 }

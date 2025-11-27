@@ -31,9 +31,23 @@ public class Program
         //builder.Services.AddAuthorization();
         //.LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
         builder.Services.AddHostedService<ProxyConfigHostedService>();
+        
         var app = builder.Build();
         app.UseRouting();
-        app.MapGet("/", () => "Welcome to AspireDemo.Gateway!"); // inutile, mais c'est pour la d�mo :)
+        app.MapGet("/", () => "Welcome to AspireDemo.Gateway!"); // inutile, mais c'est pour la démo :)
+        
+        // 添加 YARP 配置查看端点
+        app.MapGet("/api/yarpconfig", (InMemoryConfigProvider configProvider) =>
+        {
+            var config = configProvider.GetConfig();
+            
+            return Results.Json(config, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            });
+        }).AllowAnonymous();
+        
         app.MapHealthChecks("/health").AllowAnonymous();
         app.MapHealthChecks("/alive", new HealthCheckOptions
         {
@@ -42,7 +56,7 @@ public class Program
         //app.MapReverseProxy();
         app.MapReverseProxy(proxyPipeline =>
         {
-            // �ڴ����ܵ������������м��
+            // 在此添加管道中间件
             //proxyPipeline.UseXxxMiddleware();
         });
 
