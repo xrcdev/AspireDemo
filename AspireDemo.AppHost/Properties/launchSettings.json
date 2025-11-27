@@ -11,7 +11,10 @@
         "DOTNET_ENVIRONMENT": "Development",
         "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21197",
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22131",
-        "OTEL_PERSISTENCE_EXPORTER_ENDPOINT": "http://localhost:4318" //http
+        "OTEL_PERSISTENCE_EXPORTER_ENDPOINT": "http://localhost:4318", //http
+        "NACOS_AUTH_TOKEN": "SecretKey012345678901234567890123456789012345678901234567890123456789",
+        "NACOS_AUTH_IDENTITY_KEY": "AspireDemoKey",
+        "NACOS_AUTH_IDENTITY_VALUE": "AspireDemoValue"
       }
     },
     "http": {

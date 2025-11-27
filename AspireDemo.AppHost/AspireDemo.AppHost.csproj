@@ -1,10 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <Sdk Name="Aspire.AppHost.Sdk" Version="13.0.0" />
-
+<Project Sdk="Aspire.AppHost.Sdk/13.0.0">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>b1b1ddbb-d7f5-4e97-b18d-e0086c0e1387</UserSecretsId>
@@ -12,11 +9,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AspireDemo.ApiService\AspireDemo.ApiService.csproj" />
+    <ProjectReference Include="..\AspireDemo.Gateway\AspireDemo.Gateway.csproj" />
     <ProjectReference Include="..\AspireDemo.Web\AspireDemo.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.AppHost" Version="13.0.0" />
     <PackageReference Include="Aspire.Hosting.Docker" Version="13.0.0-preview.1.25560.3" />
     <PackageReference Include="Aspire.Hosting.Kubernetes" Version="13.0.0-preview.1.25560.3" />
     <PackageReference Include="Aspire.Hosting.Redis" Version="13.0.0" />

@@ -3,6 +3,17 @@ var builder = WebApplication.CreateBuilder(args);
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
 
+// 添加 Consul 服务注册
+builder.AddConsulServiceRegistration(options =>
+{
+    options.ServiceName = "apiservice";
+    options.PathPrefix = "/api";
+    options.Weight = 1;
+    options.Protocol = "http";
+    options.Tags.Add("api");
+    options.Tags.Add("weather");
+});
+
 // Add services to the container.
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
