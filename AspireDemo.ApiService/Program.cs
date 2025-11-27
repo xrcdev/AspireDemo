@@ -10,7 +10,7 @@ builder.AddConsulServiceRegistration(options =>
     options.PathPrefix = "/api";
     options.Weight = 1;
     options.Protocol = ServiceProtocolTypes.Http;
-    options.PreferredNetworks = "127";
+    options.PreferredNetworks = "10.10";
     options.Tags.Add("api");
     options.Tags.Add("weather");
 });

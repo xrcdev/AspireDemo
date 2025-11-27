@@ -277,7 +277,15 @@ internal class ConsulServiceRegistrationHostedService : IHostedService
             {
                 // 替换通配符地址为真实 IP
                 var addressUri = new Uri(ReplaceAddress(item, _options.PreferredNetworks));
-                return (addressUri.Host, addressUri.Port, addressUri.Scheme);
+                
+                // 确保不使用 127.0.0.1 或 localhost,因为 Consul 无法访问
+                var host = addressUri.Host;
+                if (host == "127.0.0.1" || host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+                {
+                    host = GetCurrentIp(_options.PreferredNetworks ?? string.Empty);
+                }
+                
+                return (host, addressUri.Port, addressUri.Scheme);
             }
         }
 

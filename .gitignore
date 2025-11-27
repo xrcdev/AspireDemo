@@ -361,4 +361,4 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-/AspireDemo.AppHost/consul-data/raft/wal/00000000000000000001-0000000000000000.wal
+/AspireDemo.AppHost/consul-data
