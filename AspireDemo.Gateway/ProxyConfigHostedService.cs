@@ -222,14 +222,22 @@ internal class ProxyConfigHostedService : BackgroundService
 
             var transforms = new List<IReadOnlyDictionary<string, string>>();
 
-            // 去除服务名称前缀的转换
-            if (string.IsNullOrEmpty(pathPrefix))
-            {
-                //transforms.Add(new Dictionary<string, string>
-                //{
-                //    ["PathRemovePrefix"] = $"/api/{serviceName}"
-                //});
-            }
+            // 去除路径前缀的转换，将 /weather/xxx 转换为 /xxx
+            //if (!string.IsNullOrEmpty(pathPrefix))
+            //{
+            //    transforms.Add(new Dictionary<string, string>
+            //    {
+            //        ["PathRemovePrefix"] = pathPrefix
+            //    });
+            //}
+            //else
+            //{
+            //    // 如果使用默认的 /api/{serviceName} 路径，去除服务名称前缀
+            //    transforms.Add(new Dictionary<string, string>
+            //    {
+            //        ["PathRemovePrefix"] = $"/api/{serviceName}"
+            //    });
+            //}
 
             var routeConfig = new RouteConfig
             {
@@ -309,22 +317,22 @@ internal class ProxyConfigHostedService : BackgroundService
                 {
                     DangerousAcceptAnyServerCertificate = true
                 },
-                HealthCheck = new HealthCheckConfig
-                {
-                    Active = new ActiveHealthCheckConfig
-                    {
-                        Enabled = true,
-                        Interval = TimeSpan.FromSeconds(30),
-                        Timeout = TimeSpan.FromSeconds(10),
-                        Path = "/health"
-                    },
-                    Passive = new PassiveHealthCheckConfig
-                    {
-                        Enabled = true,
-                        Policy = "TransportFailureRateHealthPolicy",
-                        ReactivationPeriod = TimeSpan.FromSeconds(60)
-                    }
-                },
+                //HealthCheck = new HealthCheckConfig
+                //{
+                //    Active = new ActiveHealthCheckConfig
+                //    {
+                //        Enabled = true,
+                //        Interval = TimeSpan.FromSeconds(10),
+                //        Timeout = TimeSpan.FromSeconds(5),
+                //        Path = "/health"
+                //    },
+                //    Passive = new PassiveHealthCheckConfig
+                //    {
+                //        Enabled = true,
+                //        Policy = "TransportFailureRateHealthPolicy",
+                //        ReactivationPeriod = TimeSpan.FromSeconds(30)
+                //    }
+                //},
                 Metadata = new Dictionary<string, string>
                 {
                     ["serviceName"] = serviceName
@@ -371,22 +379,3 @@ public class ConsulServiceDiscoveryOptions
     /// </summary>
     public Dictionary<string, string> ServiceRouteMappings { get; set; } = new();
 }
-
-///// <summary>
-///// 网关服务实例信息
-///// </summary>
-//public class ConsulServiceInstance
-//{
-//    public string ServiceId { get; set; } = string.Empty;
-//    public string ServiceName { get; set; } = string.Empty;
-//    public string Address { get; set; } = string.Empty;
-//    public int Port { get; set; }
-//    public List<string> Tags { get; set; } = new();
-//    public IDictionary<string, string> Meta { get; set; } = new Dictionary<string, string>();
-//    public string PathPrefix { get; set; } = string.Empty;
-//    public int Weight { get; set; } = 1;
-//    public string Scheme { get; set; } = "http";
-//    public string Protocol { get; set; } = "http";
-
-//    public string GetServiceUrl() => $"{Scheme}://{Address}:{Port}";
-//}

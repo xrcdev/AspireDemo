@@ -29,7 +29,6 @@ if (app.Environment.IsDevelopment())
 }
 
 string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
-
 app.MapGet("/weather/api/weatherforecast", () =>
 {
     var formUrl = Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "Unknown";
