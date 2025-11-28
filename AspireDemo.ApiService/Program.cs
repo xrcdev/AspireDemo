@@ -1,16 +1,13 @@
+using AspireDemo.ServiceDefaults.Consul;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
 
+
 // 添加 Consul 服务注册
-builder.AddConsulServiceRegistration(options =>
-{
-    options.ServiceName = "apiservice";
-    options.PreferredNetworks = "10.10";
-    options.Tags.Add("api");
-    options.Tags.Add("weather");
-});
+builder.AddConsulServiceRegistration();
 
 // Add services to the container.
 if (builder.Environment.IsDevelopment())
@@ -33,7 +30,7 @@ if (app.Environment.IsDevelopment())
 
 string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
 
-app.MapGet("/api/weatherforecast", () =>
+app.MapGet("/weather/api/weatherforecast", () =>
 {
     var formUrl = Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "Unknown";
 

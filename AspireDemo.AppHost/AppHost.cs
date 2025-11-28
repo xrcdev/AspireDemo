@@ -15,14 +15,12 @@ var apiService = builder.AddProject<Projects.AspireDemo_ApiService>("apiservice"
     //.WithReference(consul)
     //.WithAnnotation(new ResourceRelationshipAnnotation(consul.Resource, "Reference"))
     .WaitFor(consul)
-    .WithEnvironment("Consul__ServerAddresses__0", consul.GetEndpoint("http"))
-    .WithEnvironment("Consul__Address", consul.GetEndpoint("http"))
+    .WithEnvironment("CONSUL_ADDRESS", consul.GetEndpoint("http"))
     .WithReplicas(2)
     .PublishAsDockerFile(); // 生成 Dockerfile;
 
 var gateway = builder.AddProject<Projects.AspireDemo_Gateway>("gateway")
-    .WithEnvironment("Consul__ServerAddresses__0", consul.GetEndpoint("http"))
-    .WithEnvironment("Consul__Address", consul.GetEndpoint("http"))
+    .WithEnvironment("CONSUL_ADDRESS", consul.GetEndpoint("http"))
     .WaitFor(consul);
 
 var webfrontend = builder.AddProject<Projects.AspireDemo_Web>("webfrontend")
@@ -30,8 +28,8 @@ var webfrontend = builder.AddProject<Projects.AspireDemo_Web>("webfrontend")
     .WithHttpHealthCheck("/health")
     .WithReference(cache)
     .WaitFor(cache)
-    //.WithReference(apiService)
-    //.WaitFor(apiService)
+    .WithReference(apiService)
+    .WaitFor(apiService)
     .WithReference(gateway)
     .WaitFor(gateway)
     .PublishAsDockerFile();

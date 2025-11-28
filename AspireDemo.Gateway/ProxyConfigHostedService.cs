@@ -1,40 +1,17 @@
 ﻿using Consul;
 using Yarp.ReverseProxy.Configuration;
-using YarpRouteConfig = Yarp.ReverseProxy.Configuration.RouteConfig;
-using YarpClusterConfig = Yarp.ReverseProxy.Configuration.ClusterConfig;
-using YarpDestinationConfig = Yarp.ReverseProxy.Configuration.DestinationConfig;
-using YarpHealthCheckConfig = Yarp.ReverseProxy.Configuration.HealthCheckConfig;
-using YarpActiveHealthCheckConfig = Yarp.ReverseProxy.Configuration.ActiveHealthCheckConfig;
-using YarpPassiveHealthCheckConfig = Yarp.ReverseProxy.Configuration.PassiveHealthCheckConfig;
-using YarpRouteMatch = Yarp.ReverseProxy.Configuration.RouteMatch;
+using RouteConfig = Yarp.ReverseProxy.Configuration.RouteConfig;
+using DestinationConfig = Yarp.ReverseProxy.Configuration.DestinationConfig;
+using PassiveHealthCheckConfig = Yarp.ReverseProxy.Configuration.PassiveHealthCheckConfig;
+using AspireDemo.ServiceDefaults.Consul;
+
+//using ClusterConfig = Yarp.ReverseProxy.Configuration.ClusterConfig;
+//using HealthCheckConfig = Yarp.ReverseProxy.Configuration.HealthCheckConfig;
+//using ActiveHealthCheckConfig = Yarp.ReverseProxy.Configuration.ActiveHealthCheckConfig;
+//using RouteMatch = Yarp.ReverseProxy.Configuration.RouteMatch;
 
 namespace AspireDemo.Gateway;
 
-/// <summary>
-/// Consul 服务发现配置选项
-/// </summary>
-public class ConsulServiceDiscoveryOptions
-{
-    /// <summary>
-    /// Consul 服务器地址
-    /// </summary>
-    public string Address { get; set; } = "http://localhost:8500";
-
-    /// <summary>
-    /// 刷新间隔 (秒)
-    /// </summary>
-    public int RefreshIntervalSeconds { get; set; } = 10;
-
-    /// <summary>
-    /// 要监控的服务名称列表 (为空则监控所有服务)
-    /// </summary>
-    public List<string> ServiceNames { get; set; } = new();
-
-    /// <summary>
-    /// 服务名称到路由路径的映射
-    /// </summary>
-    public Dictionary<string, string> ServiceRouteMappings { get; set; } = new();
-}
 
 /// <summary>
 /// 代理配置托管服务 - 从 Consul 获取服务信息并更新 YARP 网关配置
@@ -47,8 +24,10 @@ internal class ProxyConfigHostedService : BackgroundService
     private readonly IConfiguration _configuration;
     private readonly ConsulServiceDiscoveryOptions _options;
 
-    // 缓存上一次的服务配置，用于检测变化
-    private Dictionary<string, List<GatewayServiceInstance>> _lastServiceInstances = new();
+    /// <summary>
+    /// 缓存上一次的服务配置，用于检测变化
+    /// </summary>
+    private Dictionary<string, List<ConsulServiceInstance>> _lastServiceInstances = new();
 
     public ProxyConfigHostedService(
         InMemoryConfigProvider inMemoryConfigProvider,
@@ -68,7 +47,7 @@ internal class ProxyConfigHostedService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // 等待一段时间让服务启动
-        await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+        await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -107,10 +86,10 @@ internal class ProxyConfigHostedService : BackgroundService
             routes.Count, clusters.Count);
     }
 
-    private async Task<Dictionary<string, List<GatewayServiceInstance>>> GetAllServicesFromConsulAsync(
+    private async Task<Dictionary<string, List<ConsulServiceInstance>>> GetAllServicesFromConsulAsync(
         CancellationToken cancellationToken)
     {
-        var result = new Dictionary<string, List<GatewayServiceInstance>>();
+        var result = new Dictionary<string, List<ConsulServiceInstance>>();
 
         try
         {
@@ -147,7 +126,14 @@ internal class ProxyConfigHostedService : BackgroundService
         return result;
     }
 
-    private async Task<List<GatewayServiceInstance>> GetServiceInstancesAsync(
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="serviceName"></param>
+    /// <param name="passingOnly"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    private async Task<List<ConsulServiceInstance>> GetServiceInstancesAsync(
         string serviceName,
         bool passingOnly,
         CancellationToken cancellationToken)
@@ -155,7 +141,7 @@ internal class ProxyConfigHostedService : BackgroundService
         var queryResult = await _consulClient.Health.Service(serviceName, string.Empty, passingOnly, cancellationToken);
 
         return queryResult.Response
-            .Select(entry => new GatewayServiceInstance
+            .Select(entry => new ConsulServiceInstance
             {
                 ServiceId = entry.Service.ID,
                 ServiceName = entry.Service.Service,
@@ -180,7 +166,7 @@ internal class ProxyConfigHostedService : BackgroundService
         return value ?? defaultValue;
     }
 
-    private bool HasServicesChanged(Dictionary<string, List<GatewayServiceInstance>> newServices)
+    private bool HasServicesChanged(Dictionary<string, List<ConsulServiceInstance>> newServices)
     {
         if (_lastServiceInstances.Count != newServices.Count)
             return true;
@@ -203,9 +189,9 @@ internal class ProxyConfigHostedService : BackgroundService
         return false;
     }
 
-    private IReadOnlyList<YarpRouteConfig> BuildRoutes(Dictionary<string, List<GatewayServiceInstance>> services)
+    private IReadOnlyList<RouteConfig> BuildRoutes(Dictionary<string, List<ConsulServiceInstance>> services)
     {
-        var routes = new List<YarpRouteConfig>();
+        var routes = new List<RouteConfig>();
 
         foreach (var service in services)
         {
@@ -239,17 +225,17 @@ internal class ProxyConfigHostedService : BackgroundService
             // 去除服务名称前缀的转换
             if (string.IsNullOrEmpty(pathPrefix))
             {
-                transforms.Add(new Dictionary<string, string>
-                {
-                    ["PathRemovePrefix"] = $"/api/{serviceName}"
-                });
+                //transforms.Add(new Dictionary<string, string>
+                //{
+                //    ["PathRemovePrefix"] = $"/api/{serviceName}"
+                //});
             }
 
-            var routeConfig = new YarpRouteConfig
+            var routeConfig = new RouteConfig
             {
                 RouteId = $"route-{serviceName}",
                 ClusterId = $"cluster-{serviceName}",
-                Match = new YarpRouteMatch
+                Match = new RouteMatch
                 {
                     Path = routePath
                 },
@@ -264,31 +250,31 @@ internal class ProxyConfigHostedService : BackgroundService
         }
 
         // 添加默认的 catch-all 路由 (可选)
-        if (services.Count > 0)
-        {
-            // 获取第一个服务作为默认后端
-            var defaultService = services.FirstOrDefault();
-            if (defaultService.Value?.Count > 0)
-            {
-                routes.Add(new YarpRouteConfig
-                {
-                    RouteId = "route-default",
-                    ClusterId = $"cluster-{defaultService.Key}",
-                    Order = int.MaxValue, // 最低优先级
-                    Match = new YarpRouteMatch
-                    {
-                        Path = "{**catch-all}"
-                    }
-                });
-            }
-        }
+        //if (services.Count > 0)
+        //{
+        //    // 获取第一个服务作为默认后端
+        //    var defaultService = services.FirstOrDefault();
+        //    if (defaultService.Value?.Count > 0)
+        //    {
+        //        routes.Add(new RouteConfig
+        //        {
+        //            RouteId = "route-default",
+        //            ClusterId = $"cluster-{defaultService.Key}",
+        //            Order = int.MaxValue, // 最低优先级
+        //            Match = new RouteMatch
+        //            {
+        //                Path = "{**catch-all}"
+        //            }
+        //        });
+        //    }
+        //}
 
         return routes;
     }
 
-    private IReadOnlyList<YarpClusterConfig> BuildClusters(Dictionary<string, List<GatewayServiceInstance>> services)
+    private IReadOnlyList<ClusterConfig> BuildClusters(Dictionary<string, List<ConsulServiceInstance>> services)
     {
-        var clusters = new List<YarpClusterConfig>();
+        var clusters = new List<ClusterConfig>();
 
         foreach (var service in services)
         {
@@ -298,12 +284,12 @@ internal class ProxyConfigHostedService : BackgroundService
             if (instances.Count == 0)
                 continue;
 
-            var destinations = new Dictionary<string, YarpDestinationConfig>();
+            var destinations = new Dictionary<string, DestinationConfig>();
 
             foreach (var instance in instances)
             {
                 var destinationId = instance.ServiceId;
-                destinations[destinationId] = new YarpDestinationConfig
+                destinations[destinationId] = new DestinationConfig
                 {
                     Address = instance.GetServiceUrl(),
                     Metadata = new Dictionary<string, string>
@@ -314,21 +300,25 @@ internal class ProxyConfigHostedService : BackgroundService
                 };
             }
 
-            var clusterConfig = new YarpClusterConfig
+            var clusterConfig = new ClusterConfig
             {
                 ClusterId = $"cluster-{serviceName}",
                 Destinations = destinations,
                 LoadBalancingPolicy = GetLoadBalancingPolicy(instances),
-                HealthCheck = new YarpHealthCheckConfig
+                HttpClient = new HttpClientConfig
                 {
-                    Active = new YarpActiveHealthCheckConfig
+                    DangerousAcceptAnyServerCertificate = true
+                },
+                HealthCheck = new HealthCheckConfig
+                {
+                    Active = new ActiveHealthCheckConfig
                     {
                         Enabled = true,
                         Interval = TimeSpan.FromSeconds(30),
                         Timeout = TimeSpan.FromSeconds(10),
                         Path = "/health"
                     },
-                    Passive = new YarpPassiveHealthCheckConfig
+                    Passive = new PassiveHealthCheckConfig
                     {
                         Enabled = true,
                         Policy = "TransportFailureRateHealthPolicy",
@@ -347,7 +337,7 @@ internal class ProxyConfigHostedService : BackgroundService
         return clusters;
     }
 
-    private static string GetLoadBalancingPolicy(List<GatewayServiceInstance> instances)
+    private static string GetLoadBalancingPolicy(List<ConsulServiceInstance> instances)
     {
         // 如果所有实例的权重都相同，使用轮询
         var weights = instances.Select(i => i.Weight).Distinct().ToList();
@@ -362,20 +352,41 @@ internal class ProxyConfigHostedService : BackgroundService
 }
 
 /// <summary>
-/// 网关服务实例信息
+/// Consul 服务发现配置选项
 /// </summary>
-public class GatewayServiceInstance
+public class ConsulServiceDiscoveryOptions
 {
-    public string ServiceId { get; set; } = string.Empty;
-    public string ServiceName { get; set; } = string.Empty;
-    public string Address { get; set; } = string.Empty;
-    public int Port { get; set; }
-    public List<string> Tags { get; set; } = new();
-    public IDictionary<string, string> Meta { get; set; } = new Dictionary<string, string>();
-    public string PathPrefix { get; set; } = string.Empty;
-    public int Weight { get; set; } = 1;
-    public string Scheme { get; set; } = "http";
-    public string Protocol { get; set; } = "http";
+    /// <summary>
+    /// 刷新间隔 (秒)
+    /// </summary>
+    public int RefreshIntervalSeconds { get; set; } = 10;
 
-    public string GetServiceUrl() => $"{Scheme}://{Address}:{Port}";
+    /// <summary>
+    /// 要监控的服务名称列表 (为空则监控所有服务)
+    /// </summary>
+    public List<string> ServiceNames { get; set; } = new();
+
+    /// <summary>
+    /// 服务名称到路由路径的映射
+    /// </summary>
+    public Dictionary<string, string> ServiceRouteMappings { get; set; } = new();
 }
+
+///// <summary>
+///// 网关服务实例信息
+///// </summary>
+//public class ConsulServiceInstance
+//{
+//    public string ServiceId { get; set; } = string.Empty;
+//    public string ServiceName { get; set; } = string.Empty;
+//    public string Address { get; set; } = string.Empty;
+//    public int Port { get; set; }
+//    public List<string> Tags { get; set; } = new();
+//    public IDictionary<string, string> Meta { get; set; } = new Dictionary<string, string>();
+//    public string PathPrefix { get; set; } = string.Empty;
+//    public int Weight { get; set; } = 1;
+//    public string Scheme { get; set; } = "http";
+//    public string Protocol { get; set; } = "http";
+
+//    public string GetServiceUrl() => $"{Scheme}://{Address}:{Port}";
+//}
