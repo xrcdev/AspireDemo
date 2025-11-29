@@ -95,23 +95,28 @@ public static class Extensions
         {
             var endpointUri = new Uri(externalEndpoint);
 
-            builder.Services.AddOpenTelemetry()
-                .WithLogging(l => l.AddOtlpExporter(opts =>
-                {
-                    opts.Protocol = OtlpExportProtocol.HttpProtobuf;
-                    opts.Endpoint = endpointUri;
-                }))
-                .WithTracing(t => t.AddOtlpExporter(opts =>
-                {
-                    opts.Protocol = OtlpExportProtocol.HttpProtobuf;
-                    opts.Endpoint = endpointUri;
-                }))
-                .WithMetrics(m => m.AddOtlpExporter(opts =>
-                {
-                    opts.Protocol = OtlpExportProtocol.HttpProtobuf;
-                    opts.Endpoint = endpointUri;
-                }));
+            builder.Services.Configure<OpenTelemetryLoggerOptions>(logging => logging.AddOtlpExporter(opts =>
+            {
+                opts.Protocol = OtlpExportProtocol.HttpProtobuf;
+                opts.Endpoint = endpointUri;
+            }));
+            builder.Services.Configure<TracerProviderBuilder>(tracing => tracing.AddOtlpExporter(opts =>
+            {
+                opts.Protocol = OtlpExportProtocol.HttpProtobuf;
+                opts.Endpoint = endpointUri;
+            }));
+            builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddOtlpExporter(opts =>
+            {
+                opts.Protocol = OtlpExportProtocol.HttpProtobuf;
+                opts.Endpoint = endpointUri;
+            }));
         }
+
+        // For debugging, it's useful to write telemetry to the console.
+        builder.Services.Configure<OpenTelemetryLoggerOptions>(logging => logging.AddConsoleExporter());
+        builder.Services.Configure<TracerProviderBuilder>(tracing => tracing.AddConsoleExporter());
+        builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddConsoleExporter());
+
         //Uncomment the following lines to enable the Azure Monitor exporter(requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
         //if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
         //{

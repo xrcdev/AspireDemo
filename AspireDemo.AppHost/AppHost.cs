@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Google.Protobuf.WellKnownTypes;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -36,7 +37,14 @@ var webfrontend = builder.AddProject<Projects.AspireDemo_Web>("webfrontend")
 
 //var scalar= builder.AddScalarApiReference();
 //scalar.WithReference(apiService);
+// 是调试模式 ,还是发布清单模式
+if (builder.ExecutionContext.IsRunMode)
+{
 
+}
+else
+{
+}
 builder.Build().Run();
 
 
