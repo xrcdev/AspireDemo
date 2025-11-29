@@ -2,6 +2,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Google.Protobuf.WellKnownTypes;
 
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 var cache = builder.AddRedis("cache")
@@ -42,9 +43,7 @@ if (builder.ExecutionContext.IsRunMode)
 {
 
 }
-else
-{
-}
+
 builder.Build().Run();
 
 

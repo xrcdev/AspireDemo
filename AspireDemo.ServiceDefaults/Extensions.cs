@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Builder;
+Ôªøusing Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -82,83 +82,148 @@ public static class Extensions
 
     private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
-        // 1) OTLP Exporter - Õ‚≤ø Collector µº≥ˆ
-        var enableOtlp = builder.Configuration["OpenTelemetry:Exporters:Otlp:Enabled"];
-        var useOtlpExporter = string.IsNullOrWhiteSpace(enableOtlp) || bool.Parse(enableOtlp);
-        
+        var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+
         if (useOtlpExporter)
         {
-            var externalEndpoint = builder.Configuration["OTEL_PERSISTENCE_EXPORTER_ENDPOINT"];
-            if (string.IsNullOrWhiteSpace(externalEndpoint)) externalEndpoint = "http://localhost:4318";
-
-            if (!string.IsNullOrWhiteSpace(externalEndpoint))
-            {
-                var endpointUri = new Uri(externalEndpoint);
-
-                builder.Services.Configure<OpenTelemetryLoggerOptions>(logging => logging.AddOtlpExporter(opts =>
-                {
-                    opts.Protocol = OtlpExportProtocol.HttpProtobuf;
-                    opts.Endpoint = endpointUri;
-                }));
-                builder.Services.Configure<TracerProviderBuilder>(tracing => tracing.AddOtlpExporter(opts =>
-                {
-                    opts.Protocol = OtlpExportProtocol.HttpProtobuf;
-                    opts.Endpoint = endpointUri;
-                }));
-                builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddOtlpExporter(opts =>
-                {
-                    opts.Protocol = OtlpExportProtocol.HttpProtobuf;
-                    opts.Endpoint = endpointUri;
-                }));
-            }
+            builder.Services.AddOpenTelemetry().UseOtlpExporter();
         }
 
-        // 2) Console Exporter - øÿ÷∆Ã® ‰≥ˆ£®µ˜ ‘”√£©
-        var enableConsole = builder.Configuration["OpenTelemetry:Exporters:Console:Enabled"];
-        var useConsoleExporter = !string.IsNullOrWhiteSpace(enableConsole) && bool.Parse(enableConsole);
-        
-        if (useConsoleExporter)
-        {
-            builder.Services.Configure<OpenTelemetryLoggerOptions>(logging => logging.AddConsoleExporter());
-            builder.Services.Configure<TracerProviderBuilder>(tracing => tracing.AddConsoleExporter());
-            builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddConsoleExporter());
-        }
-
-        // 3) InMemory Exporter - ƒ⁄¥Ê¥Ê¥¢£®≤‚ ‘”√£©
-        var enableInMemory = builder.Configuration["OpenTelemetry:Exporters:InMemory:Enabled"];
-        var useInMemoryExporter = !string.IsNullOrWhiteSpace(enableInMemory) && bool.Parse(enableInMemory);
-        
-        if (useInMemoryExporter)
-        {
-            builder.Services.Configure<OpenTelemetryLoggerOptions>(logging => logging.AddInMemoryExporter(builder.Services.BuildServiceProvider().GetService<ICollection<LogRecord>>()));
-            builder.Services.Configure<TracerProviderBuilder>(tracing => tracing.AddInMemoryExporter(builder.Services.BuildServiceProvider().GetService<ICollection<Activity>>()));
-            builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddInMemoryExporter(builder.Services.BuildServiceProvider().GetService<ICollection<Metric>>()));
-        }
-
-        // 4) Prometheus HttpListener Exporter - Prometheus ¿≠»°ƒ£ Ω
-        var enablePrometheus = builder.Configuration["OpenTelemetry:Exporters:Prometheus:Enabled"];
-        var usePrometheusExporter = !string.IsNullOrWhiteSpace(enablePrometheus) && bool.Parse(enablePrometheus);
-        
-        if (usePrometheusExporter)
-        {
-            var prometheusPort = builder.Configuration["OpenTelemetry:Exporters:Prometheus:Port"];
-            var port = string.IsNullOrWhiteSpace(prometheusPort) ? 9464 : int.Parse(prometheusPort);
-            
-            builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddPrometheusHttpListener(opts =>
-            {
-                opts.UriPrefixes = [$"http://localhost:{port}/"];
-            }));
-        }
-
-        //Uncomment the following lines to enable the Azure Monitor exporter(requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
+        // Uncomment the following lines to enable the Azure Monitor exporter (requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
         //if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
         //{
         //    builder.Services.AddOpenTelemetry()
-        //       //.UseAzureMonitor();
+        //       .UseAzureMonitor();
         //}
 
         return builder;
     }
+
+    //public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    //{
+    //    builder.Logging.AddOpenTelemetry(logging =>
+    //    {
+    //        logging.IncludeFormattedMessage = true;
+    //        logging.IncludeScopes = true;
+    //    });
+
+    //    builder.Services.AddOpenTelemetry()
+    //        .WithMetrics(metrics =>
+    //        {
+    //            metrics.AddAspNetCoreInstrumentation()
+    //                .AddHttpClientInstrumentation()
+    //                .AddRuntimeInstrumentation();
+    //        })
+    //        .WithTracing(tracing =>
+    //        {
+    //            tracing.AddSource(builder.Environment.ApplicationName)
+    //                .AddAspNetCoreInstrumentation(tracing =>
+    //                    // Exclude health check requests from tracing
+    //                    tracing.Filter = context =>
+    //                        !context.Request.Path.StartsWithSegments(HealthEndpointPath)
+    //                        && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
+    //                )
+    //                // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
+    //                //.AddGrpcClientInstrumentation()
+    //                .AddHttpClientInstrumentation();
+    //        });
+
+    //    builder.AddOpenTelemetryExporters();
+
+    //    return builder;
+    //}
+
+    //private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    //{
+    //    // 1) OTLP Exporter - Â§ñÈÉ® Collector ÈÖçÁΩÆ
+    //    var enableOtlp = builder.Configuration["OpenTelemetry:Exporters:Otlp:Enabled"];
+    //    var useOtlpExporter = string.IsNullOrWhiteSpace(enableOtlp) || bool.Parse(enableOtlp);
+
+    //    if (useOtlpExporter)
+    //    {
+    //        // ‰ºòÂÖà‰ΩøÁî® Aspire Ê≥®ÂÖ•ÁöÑÊ†áÂáÜÁéØÂ¢ÉÂèòÈáè OTEL_EXPORTER_OTLP_ENDPOINT
+    //        var otlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
+
+    //        if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+    //        {
+    //            builder.Services.Configure<OpenTelemetryLoggerOptions>(logging => logging.AddOtlpExporter());
+    //            builder.Services.Configure<TracerProviderBuilder>(tracing => tracing.AddOtlpExporter(options => options.Endpoint = new Uri(otlpEndpoint)));
+    //            builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddOtlpExporter(options => options.Endpoint = new Uri(otlpEndpoint)));
+    //        }
+    //        else
+    //        {
+    //            var externalEndpoint = builder.Configuration["OTEL_PERSISTENCE_EXPORTER_ENDPOINT"];
+    //            if (string.IsNullOrWhiteSpace(externalEndpoint)) externalEndpoint = "http://localhost:4318";
+
+    //            if (!string.IsNullOrWhiteSpace(externalEndpoint))
+    //            {
+    //                var endpointUri = new Uri(externalEndpoint);
+
+    //                builder.Services.Configure<OpenTelemetryLoggerOptions>(logging => logging.AddOtlpExporter(opts =>
+    //                {
+    //                    opts.Protocol = OtlpExportProtocol.HttpProtobuf;
+    //                    opts.Endpoint = endpointUri;
+    //                }));
+    //                builder.Services.Configure<TracerProviderBuilder>(tracing => tracing.AddOtlpExporter(opts =>
+    //                {
+    //                    opts.Protocol = OtlpExportProtocol.HttpProtobuf;
+    //                    opts.Endpoint = endpointUri;
+    //                }));
+    //                builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddOtlpExporter(opts =>
+    //                {
+    //                    opts.Protocol = OtlpExportProtocol.HttpProtobuf;
+    //                    opts.Endpoint = endpointUri;
+    //                }));
+    //            }
+    //        }
+    //    }
+
+    //    // 2) Console Exporter - ÊéßÂà∂Âè∞ËæìÂá∫ÈÖçÁΩÆ
+    //    var enableConsole = builder.Configuration["OpenTelemetry:Exporters:Console:Enabled"];
+    //    var useConsoleExporter = !string.IsNullOrWhiteSpace(enableConsole) && bool.Parse(enableConsole);
+
+    //    if (useConsoleExporter)
+    //    {
+    //        builder.Services.Configure<OpenTelemetryLoggerOptions>(logging => logging.AddConsoleExporter());
+    //        builder.Services.Configure<TracerProviderBuilder>(tracing => tracing.AddConsoleExporter());
+    //        builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddConsoleExporter());
+    //    }
+
+    //    // 3) InMemory Exporter - ÂÜÖÂ≠òÂØºÂá∫ÈÖçÁΩÆ
+    //    var enableInMemory = builder.Configuration["OpenTelemetry:Exporters:InMemory:Enabled"];
+    //    var useInMemoryExporter = !string.IsNullOrWhiteSpace(enableInMemory) && bool.Parse(enableInMemory);
+
+    //    if (useInMemoryExporter)
+    //    {
+    //        builder.Services.Configure<OpenTelemetryLoggerOptions>(logging => logging.AddInMemoryExporter(builder.Services.BuildServiceProvider().GetService<ICollection<LogRecord>>()));
+    //        //builder.Services.Configure<TracerProviderBuilder>(tracing => tracing.AddInMemoryExporter(builder.Services.BuildServiceProvider().GetService<ICollection<Activity>>()));
+    //        builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddInMemoryExporter(builder.Services.BuildServiceProvider().GetService<ICollection<Metric>>()));
+    //    }
+
+    //    // 4) Prometheus HttpListener Exporter - Prometheus ÊãâÂèñÊ®°Âºè
+    //    var enablePrometheus = builder.Configuration["OpenTelemetry:Exporters:Prometheus:Enabled"];
+    //    var usePrometheusExporter = !string.IsNullOrWhiteSpace(enablePrometheus) && bool.Parse(enablePrometheus);
+
+    //    if (usePrometheusExporter)
+    //    {
+    //        var prometheusPort = builder.Configuration["OpenTelemetry:Exporters:Prometheus:Port"];
+    //        var port = string.IsNullOrWhiteSpace(prometheusPort) ? 9464 : int.Parse(prometheusPort);
+
+    //        builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddPrometheusHttpListener(opts =>
+    //        {
+    //            opts.UriPrefixes = [$"http://localhost:{port}/"];
+    //        }));
+    //    }
+
+    //    //Uncomment the following lines to enable the Azure Monitor exporter(requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
+    //    //if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+    //    //{
+    //    //    builder.Services.AddOpenTelemetry()
+    //    //       //.UseAzureMonitor();
+    //    //}
+
+    //    return builder;
+    //}
 
     public static TBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {

@@ -9,9 +9,12 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "DOTNET_ENVIRONMENT": "Development",
-        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21197",
-        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22131",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21214",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22078",
         "OTEL_PERSISTENCE_EXPORTER_ENDPOINT": "http://localhost:4318", //http
+        "DOTNET_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:16223",
+        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:21123",
+
         "NACOS_AUTH_TOKEN": "SecretKey012345678901234567890123456789012345678901234567890123456789",
         "NACOS_AUTH_IDENTITY_KEY": "AspireDemoKey",
         "NACOS_AUTH_IDENTITY_VALUE": "AspireDemoValue"
@@ -25,9 +28,11 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "DOTNET_ENVIRONMENT": "Development",
-        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19218",
-        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20299",
-        "OTEL_PERSISTENCE_EXPORTER_ENDPOINT": "http://localhost:4318" //http
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21214",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22078",
+        "OTEL_PERSISTENCE_EXPORTER_ENDPOINT": "http://localhost:4318", //http
+        "DOTNET_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:16223",
+        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:21123"
       }
     }
   }
