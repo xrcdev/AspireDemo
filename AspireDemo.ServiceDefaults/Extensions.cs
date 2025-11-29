@@ -82,40 +82,73 @@ public static class Extensions
 
     private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
-        //var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-
-        //if (useOtlpExporter)
-        //{
-        //    builder.Services.AddOpenTelemetry();//.UseOtlpExporter();
-        //}
-        var externalEndpoint = builder.Configuration["OTEL_PERSISTENCE_EXPORTER_ENDPOINT"];
-        if (string.IsNullOrWhiteSpace(externalEndpoint)) externalEndpoint = "http://localhost:4318";
-        //2) 外部 Collector 导出：显式设置自定义 Endpoint
-        if (!string.IsNullOrWhiteSpace(externalEndpoint))
+        // 1) OTLP Exporter - 外部 Collector 导出
+        var enableOtlp = builder.Configuration["OpenTelemetry:Exporters:Otlp:Enabled"];
+        var useOtlpExporter = string.IsNullOrWhiteSpace(enableOtlp) || bool.Parse(enableOtlp);
+        
+        if (useOtlpExporter)
         {
-            var endpointUri = new Uri(externalEndpoint);
+            var externalEndpoint = builder.Configuration["OTEL_PERSISTENCE_EXPORTER_ENDPOINT"];
+            if (string.IsNullOrWhiteSpace(externalEndpoint)) externalEndpoint = "http://localhost:4318";
 
-            builder.Services.Configure<OpenTelemetryLoggerOptions>(logging => logging.AddOtlpExporter(opts =>
+            if (!string.IsNullOrWhiteSpace(externalEndpoint))
             {
-                opts.Protocol = OtlpExportProtocol.HttpProtobuf;
-                opts.Endpoint = endpointUri;
-            }));
-            builder.Services.Configure<TracerProviderBuilder>(tracing => tracing.AddOtlpExporter(opts =>
-            {
-                opts.Protocol = OtlpExportProtocol.HttpProtobuf;
-                opts.Endpoint = endpointUri;
-            }));
-            builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddOtlpExporter(opts =>
-            {
-                opts.Protocol = OtlpExportProtocol.HttpProtobuf;
-                opts.Endpoint = endpointUri;
-            }));
+                var endpointUri = new Uri(externalEndpoint);
+
+                builder.Services.Configure<OpenTelemetryLoggerOptions>(logging => logging.AddOtlpExporter(opts =>
+                {
+                    opts.Protocol = OtlpExportProtocol.HttpProtobuf;
+                    opts.Endpoint = endpointUri;
+                }));
+                builder.Services.Configure<TracerProviderBuilder>(tracing => tracing.AddOtlpExporter(opts =>
+                {
+                    opts.Protocol = OtlpExportProtocol.HttpProtobuf;
+                    opts.Endpoint = endpointUri;
+                }));
+                builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddOtlpExporter(opts =>
+                {
+                    opts.Protocol = OtlpExportProtocol.HttpProtobuf;
+                    opts.Endpoint = endpointUri;
+                }));
+            }
         }
 
-        // For debugging, it's useful to write telemetry to the console.
-        builder.Services.Configure<OpenTelemetryLoggerOptions>(logging => logging.AddConsoleExporter());
-        builder.Services.Configure<TracerProviderBuilder>(tracing => tracing.AddConsoleExporter());
-        builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddConsoleExporter());
+        // 2) Console Exporter - 控制台输出（调试用）
+        var enableConsole = builder.Configuration["OpenTelemetry:Exporters:Console:Enabled"];
+        var useConsoleExporter = !string.IsNullOrWhiteSpace(enableConsole) && bool.Parse(enableConsole);
+        
+        if (useConsoleExporter)
+        {
+            builder.Services.Configure<OpenTelemetryLoggerOptions>(logging => logging.AddConsoleExporter());
+            builder.Services.Configure<TracerProviderBuilder>(tracing => tracing.AddConsoleExporter());
+            builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddConsoleExporter());
+        }
+
+        // 3) InMemory Exporter - 内存存储（测试用）
+        var enableInMemory = builder.Configuration["OpenTelemetry:Exporters:InMemory:Enabled"];
+        var useInMemoryExporter = !string.IsNullOrWhiteSpace(enableInMemory) && bool.Parse(enableInMemory);
+        
+        if (useInMemoryExporter)
+        {
+            builder.Services.Configure<OpenTelemetryLoggerOptions>(logging => logging.AddInMemoryExporter(builder.Services.BuildServiceProvider().GetService<ICollection<LogRecord>>()));
+            builder.Services.Configure<TracerProviderBuilder>(tracing => tracing.AddInMemoryExporter(builder.Services.BuildServiceProvider().GetService<ICollection<Activity>>()));
+            builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddInMemoryExporter(builder.Services.BuildServiceProvider().GetService<ICollection<Metric>>()));
+        }
+
+        // 4) Prometheus HttpListener Exporter - Prometheus 拉取模式
+        var enablePrometheus = builder.Configuration["OpenTelemetry:Exporters:Prometheus:Enabled"];
+        var usePrometheusExporter = !string.IsNullOrWhiteSpace(enablePrometheus) && bool.Parse(enablePrometheus);
+        
+        if (usePrometheusExporter)
+        {
+            var prometheusPort = builder.Configuration["OpenTelemetry:Exporters:Prometheus:Port"];
+            var port = string.IsNullOrWhiteSpace(prometheusPort) ? 9464 : int.Parse(prometheusPort);
+            
+            builder.Services.Configure<MeterProviderBuilder>(metrics => metrics.AddPrometheusHttpListener(opts =>
+            {
+                opts.UriPrefixes = [$"http://localhost:{port}/"];
+            }));
+        }
 
         //Uncomment the following lines to enable the Azure Monitor exporter(requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
         //if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
