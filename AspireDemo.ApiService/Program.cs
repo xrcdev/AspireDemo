@@ -6,7 +6,7 @@ using System.Net.Sockets;
 var builder = WebApplication.CreateBuilder(args);
 
 // 智能端口配置
-ConfigureSmartPort(builder);
+//ConfigureSmartPort(builder);
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
@@ -33,10 +33,7 @@ static void ConfigureSmartPort(WebApplicationBuilder builder)
                                                   //|| !string.IsNullOrEmpty(httpsPorts)
                           ;
 
-    // 检测是否在 Docker/容器环境中
-    bool isDockerEnvironment = IsRunningInDocker();
 
-    Console.WriteLine($"[SmartPort] Docker Environment: {isDockerEnvironment}");
     Console.WriteLine($"[SmartPort] Port Specified: {isPortSpecified}");
 
     if (isPortSpecified)
@@ -49,6 +46,10 @@ static void ConfigureSmartPort(WebApplicationBuilder builder)
         return; // 使用已指定的端口配置
     }
 
+    // 检测是否在 Docker/容器环境中
+    bool isDockerEnvironment = IsRunningInDocker();
+
+    Console.WriteLine($"[SmartPort] Docker Environment: {isDockerEnvironment}");
     if (isDockerEnvironment)
     {
         // Docker 环境下，如果没有指定端口，使用默认端口 8080
@@ -80,38 +81,38 @@ static bool IsRunningInDocker()
         return true;
     }
 
-    // 方法2: 检查 /.dockerenv 文件 (Linux Docker 环境)
-    if (File.Exists("/.dockerenv"))
+    // 方法2: 检查 /.dockerenv 文件 或 /proc/1/cgroup文件 (Linux Docker 环境)
+    if (File.Exists("/.dockerenv") || File.Exists("/proc/1/cgroup"))
     {
         return true;
     }
 
-    // 方法3: 检查 /proc/1/cgroup 是否包含 docker 或 kubepods (Linux)
-    try
-    {
-        if (File.Exists("/proc/1/cgroup"))
-        {
-            var cgroupContent = File.ReadAllText("/proc/1/cgroup");
-            if (cgroupContent.Contains("docker") || cgroupContent.Contains("kubepods") || cgroupContent.Contains("containerd"))
-            {
-                return true;
-            }
-        }
-    }
-    catch
-    {
-        // 忽略读取错误
-    }
+    //// 方法3: 检查 /proc/1/cgroup 是否包含 docker 或 kubepods (Linux)
+    //try
+    //{
+    //    if (File.Exists("/proc/1/cgroup"))
+    //    {
+    //        var cgroupContent = File.ReadAllText("/proc/1/cgroup");
+    //        if (cgroupContent.Contains("docker") || cgroupContent.Contains("kubepods") || cgroupContent.Contains("containerd"))
+    //        {
+    //            return true;
+    //        }
+    //    }
+    //}
+    //catch
+    //{
+    //    // 忽略读取错误
+    //}
 
-    // 方法4: 检查常见的容器环境变量
-    var containerEnvVars = new[] { "KUBERNETES_SERVICE_HOST", "CONTAINER_NAME" };
-    foreach (var envVar in containerEnvVars)
-    {
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(envVar)))
-        {
-            return true;
-        }
-    }
+    //// 方法4: 检查常见的容器环境变量
+    //var containerEnvVars = new[] { "KUBERNETES_SERVICE_HOST", "CONTAINER_NAME" };
+    //foreach (var envVar in containerEnvVars)
+    //{
+    //    if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(envVar)))
+    //    {
+    //        return true;
+    //    }
+    //}
 
     return false;
 }

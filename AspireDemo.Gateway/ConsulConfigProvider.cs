@@ -363,13 +363,14 @@ public class ConsulConfigProvider : IProxyConfigProvider, IHostedService, IDispo
 
     private static string GetLoadBalancingPolicy(List<ConsulServiceInstance> instances)
     {
-        // 如果所有实例的权重都相同，使用轮询
-        var weights = instances.Select(i => i.Weight).Distinct().ToList();
-        if (weights.Count == 1)
+        // 当有多个实例时，使用 PowerOfTwoChoices 负载均衡策略
+        // PowerOfTwoChoices 算法会随机选择两个目标，然后选择负载较低的一个，提供更好的负载分布
+        if (instances.Count > 1)
         {
-            return LoadBalancingPolicies.RoundRobin;
+            return LoadBalancingPolicies.PowerOfTwoChoices;
         }
-        // 如果权重不同，可以考虑使用加权负载均衡（需要自定义实现）
+        
+        // 单个实例时使用 RoundRobin
         return LoadBalancingPolicies.RoundRobin;
     }
 
